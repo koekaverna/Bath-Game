@@ -58,6 +58,9 @@ let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
 // Тепло воды: бак большой (вместимость ×10 от старого 0..1).
 const WARM_MAX = 10;
 
+// Лимит пузырей на экране — чтобы не было «стены» на высоких уровнях.
+const MAX_BUBBLES = 16;
+
 let score = 0;
 let warmth = WARM_MAX; // 0..WARM_MAX
 let combo = 0;
@@ -495,22 +498,25 @@ function update(dt) {
   panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
   const lev = curLevel - 1;
 
-  // Спавн пузырей — редко на старте, гуще с уровнем.
-  const spawnEvery = Math.max(0.13, 0.72 - lev * 0.05);
+  // Спавн пузырей: держим примерно постоянное число на экране (лимит),
+  // быстро добиваем до него на низких уровнях, без «стены» на верхних.
+  const spawnEvery = Math.max(0.18, 0.45 - lev * 0.02);
   spawnTimer -= dt;
-  if (spawnTimer <= 0) {
+  if (spawnTimer <= 0 && bubbles.length < MAX_BUBBLES) {
     spawnTimer = spawnEvery;
     bubbles.push(makeBubble());
-    if (lev >= 2 && Math.random() > 0.5) bubbles.push(makeBubble());
-    if (lev >= 5 && Math.random() > 0.5) bubbles.push(makeBubble());
+    // второй пузырь — чтобы быстрее восполнять после серий
+    if (Math.random() > 0.55 && bubbles.length < MAX_BUBBLES) {
+      bubbles.push(makeBubble());
+    }
   }
 
-  // Волна пузырей — только со 2-го уровня, размер растёт с уровнем.
+  // Волна — со 2-го уровня и только если экран не забит.
   waveTimer -= dt;
   if (waveTimer <= 0) {
     waveTimer = rand(12, 20);
-    if (curLevel >= 2) {
-      const n = Math.min(10, 3 + curLevel);
+    if (curLevel >= 2 && bubbles.length < MAX_BUBBLES - 5) {
+      const n = Math.min(5, MAX_BUBBLES - bubbles.length);
       for (let i = 0; i < n; i++) {
         const b = makeBubble("normal");
         b.x = (W / (n + 1)) * (i + 1);
@@ -546,7 +552,7 @@ function update(dt) {
   }
 
   // Пузыри (поднимаются быстрее с уровнем).
-  const riseMul = 1 + lev * 0.06; // мягче, чтобы пузыри дольше держались
+  const riseMul = 1 + lev * 0.14; // быстрее с уровнем — труднее попасть
   for (const b of bubbles) {
     b.phase += sdt * b.wobble;
     b.x += (b.drift + Math.sin(b.phase) * 14) * sdt;
