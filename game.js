@@ -159,10 +159,10 @@ function haptic(ms) {
 function pickType() {
   const r = Math.random();
   if (r > 0.99933) return "rainbow"; // ~0.07% — в 15 раз реже
-  if (r > 0.965) return "star"; // ~3.4%
-  if (r > 0.959) return "bomb"; // ~0.6% — в 5 раз реже и слабее
-  if (r > 0.885) return "duck"; // ~7.4%
-  if (r > 0.5) return "warm"; // ~38.5% — тепло
+  if (r > 0.988) return "ice"; // ~1.1% — льдинка (морозит), стала реже
+  if (r > 0.982) return "bomb"; // ~0.6% — в 5 раз реже и слабее
+  if (r > 0.9) return "duck"; // ~8.2%
+  if (r > 0.5) return "warm"; // ~40% — тепло
   return "normal"; // ~50%
 }
 
@@ -371,11 +371,11 @@ function popBubble(b, byTap) {
       triggerCameo();
       break;
 
-    case "star":
+    case "ice":
       gainScore(4, b.x, b.y, "#bfeefa");
-      timeScale = 0.32; // релакс-замедление
-      addPopup(b.x, b.y - 26, "⭐ не спеши…", "#bfeefa");
-      pluck(740, 0.5, 0.16, "sine");
+      timeScale = 0.32; // льдинка морозит — замедляет время
+      addPopup(b.x, b.y - 26, "❄️ холодок…", "#bfeefa");
+      pluck(300, 0.5, 0.16, "sine");
       break;
 
     default: // normal
@@ -456,8 +456,8 @@ function bubbleColor(type) {
       return "#ff9a3c";
     case "rainbow":
       return "#c9a7ff";
-    case "star":
-      return "#bfe8fa";
+    case "ice":
+      return "#a9d8ff";
     default:
       return "#bfeefa";
   }
@@ -695,7 +695,7 @@ function drawFire(time) {
   ctx.restore();
 }
 
-const EMOJI = { duck: "🦆", warm: "🔥", bomb: "💣", rainbow: "🌈", star: "⭐" };
+const EMOJI = { duck: "🦆", warm: "🔥", bomb: "💣", rainbow: "🌈", ice: "❄️" };
 
 function drawBubble(b) {
   const col = bubbleColor(b.type);
