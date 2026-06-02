@@ -68,8 +68,8 @@ let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
 // Тепло воды: бак большой (вместимость ×10 от старого 0..1).
 const WARM_MAX = 10;
 
-// Лимит пузырей на экране — чтобы не было «стены» на высоких уровнях.
-const MAX_BUBBLES = 16;
+// Лимит пузырей на экране — меньше, легче уследить за всеми.
+const MAX_BUBBLES = 11;
 
 let score = 0;
 let warmth = WARM_MAX; // 0..WARM_MAX
@@ -227,8 +227,8 @@ function makeBubble(type) {
   let r = rand(34, 62);
   if (type === "duck" || type === "rainbow") r = rand(50, 66);
   if (type === "bomb") r = rand(44, 58);
-  // Время жизни: на высоких уровнях пузыри живут меньше (быстрее оборот).
-  const life = Math.max(4, rand(8, 12) * (1 - panic * 0.45));
+  // Время жизни: короткое (лопаются чаще), на высоких уровнях ещё короче.
+  const life = Math.max(3, rand(5, 8) * (1 - panic * 0.4));
   return {
     x: rand(r, W - r),
     y: rand(H * 0.16, H * 0.88), // по умолчанию — где угодно по экрану
@@ -725,13 +725,12 @@ function breakCombo() {
   }
 }
 
-// Пузырь лопается сам в конце жизни: анимация + сброс серии (без награды).
+// Пузырь лопается сам в конце жизни: только анимация (серию НЕ рвёт).
 function autoPop(b) {
   b.pop = true;
   spawnSplash(b.x, b.y, bubbleColor(b.type), 9);
   ripples.push({ x: b.x, y: b.y, r: b.r * 0.5, max: b.r * 1.9, a: 0.45 });
   pluck(150, 0.12, 0.05, "triangle"); // тихий «пшик»
-  breakCombo();
 }
 
 function gainScore(base, x, y, color) {
