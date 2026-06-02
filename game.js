@@ -53,8 +53,11 @@ const MAX_LEVEL = 12; // на этом уровне фон и огонь на м
 let curLevel = 1;
 let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
 
+// Тепло воды: бак большой (вместимость ×10 от старого 0..1).
+const WARM_MAX = 10;
+
 let score = 0;
-let warmth = 1; // 0..1
+let warmth = WARM_MAX; // 0..WARM_MAX
 let combo = 0;
 let comboTimer = 0;
 let spawnTimer = 0;
@@ -153,12 +156,12 @@ function haptic(ms) {
    bomb   — цепной взрыв. rainbow — смести всё. star — замедление.        */
 function pickType() {
   const r = Math.random();
-  if (r > 0.99) return "rainbow"; // 1% — редко
-  if (r > 0.955) return "star"; // 3.5%
-  if (r > 0.925) return "bomb"; // 3% — редко
-  if (r > 0.85) return "duck"; // 7.5%
-  if (r > 0.46) return "warm"; // ~39% — больше тепла, вода стынет быстро
-  return "normal"; // ~46%
+  if (r > 0.99933) return "rainbow"; // ~0.07% — в 15 раз реже
+  if (r > 0.965) return "star"; // ~3.4%
+  if (r > 0.959) return "bomb"; // ~0.6% — в 5 раз реже и слабее
+  if (r > 0.885) return "duck"; // ~7.4%
+  if (r > 0.5) return "warm"; // ~38.5% — тепло
+  return "normal"; // ~50%
 }
 
 function makeBubble(type) {
@@ -214,7 +217,7 @@ function startGame(zen) {
   panic = 0;
   levelEl.textContent = "уровень 1";
   score = 0;
-  warmth = 1;
+  warmth = WARM_MAX;
   combo = 0;
   comboTimer = 0;
   spawnTimer = 0;
@@ -231,10 +234,10 @@ function startGame(zen) {
 
   // Стартовый «подарок»: сразу наполняем экран пузырями (с тёплыми),
   // чтобы было чем прогреться, пока вода ещё не остыла.
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 4; i++) {
     const b = makeBubble(i % 2 === 0 ? "warm" : "normal");
     b.x = rand(b.r, W - b.r);
-    b.y = rand(H * 0.3, H * 0.9);
+    b.y = rand(H * 0.35, H * 0.9);
     bubbles.push(b);
   }
 
@@ -329,13 +332,13 @@ function popBubble(b, byTap) {
 
   switch (b.type) {
     case "warm":
-      warmth = Math.min(1, warmth + 0.22);
+      warmth = Math.min(WARM_MAX, warmth + 0.8);
       gainScore(1, b.x, b.y, "#ffd0b0");
       pluck(520, 0.22, 0.16);
       break;
 
     case "duck":
-      warmth = Math.min(1, warmth + 0.08);
+      warmth = Math.min(WARM_MAX, warmth + 0.4);
       gainScore(10, b.x, b.y, "#ffe27a");
       addPopup(b.x, b.y - 26, "🦆 кря!", "#ffe27a");
       pluck(880, 0.3, 0.2);
@@ -346,10 +349,10 @@ function popBubble(b, byTap) {
 
     case "bomb":
       gainScore(3, b.x, b.y, "#ffb15e");
-      explode(b.x, b.y, 200);
+      explode(b.x, b.y, 95); // слабее: маленький радиус, не выносит весь низ
       boom();
-      shake = Math.min(shake + 16, 22);
-      addFlash("rgba(255,160,80,0.5)");
+      shake = Math.min(shake + 10, 16);
+      addFlash("rgba(255,160,80,0.35)");
       haptic([20, 40, 20]);
       triggerCameo();
       break;
@@ -386,7 +389,7 @@ function popBubble(b, byTap) {
 function explode(x, y, radius) {
   ripples.push({ x, y, r: radius * 0.2, max: radius * 1.4, a: 0.8 });
   spawnSplash(x, y, "#ffb15e", 26);
-  warmth = Math.min(1, warmth + 0.06);
+  warmth = Math.min(WARM_MAX, warmth + 0.5);
   for (const b of bubbles) {
     if (b.pop) continue;
     if (Math.hypot(b.x - x, b.y - y) <= radius) {
@@ -399,7 +402,7 @@ function explode(x, y, radius) {
 // Радуга АКТИВИРУЕТ каждый пузырь на экране — со всеми его эффектами
 // (бомбы детонируют цепями, звёзды дают слоумо, тёплые отдают тепло).
 function rainbowSweep() {
-  warmth = Math.min(1, warmth + 0.1); // базовый бонус самой радуги
+  warmth = Math.min(WARM_MAX, warmth + 1.5); // базовый бонус самой радуги
   const snapshot = bubbles.filter((b) => !b.pop);
   for (const b of snapshot) {
     if (b.pop) continue; // мог лопнуть от цепного взрыва по ходу
@@ -435,8 +438,9 @@ canvas.addEventListener("mousedown", pointerHandler);
 
 /* ---------------- UI тепла ---------------- */
 function updateWarmthUI() {
-  warmthFill.style.width = (warmth * 100).toFixed(1) + "%";
-  warmthFill.classList.toggle("cold", warmth < 0.3);
+  const wr = warmth / WARM_MAX;
+  warmthFill.style.width = (wr * 100).toFixed(1) + "%";
+  warmthFill.classList.toggle("cold", wr < 0.3);
 }
 
 /* ---------------- Цвета ---------------- */
@@ -484,34 +488,37 @@ function update(dt) {
   panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
   const lev = curLevel - 1;
 
-  // Спавн пузырей — гуще с уровнем.
-  const spawnEvery = Math.max(0.12, 0.4 - lev * 0.025);
+  // Спавн пузырей — редко на старте, гуще с уровнем.
+  const spawnEvery = Math.max(0.13, 0.72 - lev * 0.05);
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTimer = spawnEvery;
     bubbles.push(makeBubble());
-    if (Math.random() > 0.4 - lev * 0.02) bubbles.push(makeBubble());
-    if (lev >= 2 && Math.random() > 0.55) bubbles.push(makeBubble());
+    if (lev >= 2 && Math.random() > 0.5) bubbles.push(makeBubble());
+    if (lev >= 5 && Math.random() > 0.5) bubbles.push(makeBubble());
   }
 
-  // Волна пузырей — иногда всплывает целый рой.
+  // Волна пузырей — только со 2-го уровня, размер растёт с уровнем.
   waveTimer -= dt;
   if (waveTimer <= 0) {
     waveTimer = rand(12, 20);
-    const n = 5 + Math.floor(rand(0, 4));
-    for (let i = 0; i < n; i++) {
-      const b = makeBubble("normal");
-      b.x = (W / (n + 1)) * (i + 1);
-      b.y = H + b.r + i * 30;
-      bubbles.push(b);
+    if (curLevel >= 2) {
+      const n = Math.min(10, 3 + curLevel);
+      for (let i = 0; i < n; i++) {
+        const b = makeBubble("normal");
+        b.x = (W / (n + 1)) * (i + 1);
+        b.y = H + b.r + i * 30;
+        bubbles.push(b);
+      }
+      addPopup(W / 2, H * 0.3, "🌊 волна!", "#bfeefa");
     }
-    addPopup(W / 2, H * 0.3, "🌊 волна!", "#bfeefa");
   }
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
     // Первые 5 секунд — «разгон»: вода ещё не стынет.
-    const drain = elapsed < 5 ? 0 : 0.06 + lev * 0.02;
+    // Бак большой (WARM_MAX), поэтому и слив крупнее.
+    const drain = elapsed < 5 ? 0 : 0.5 + lev * 0.18;
     warmth -= dt * drain;
     if (warmth <= 0) {
       warmth = 0;
@@ -613,10 +620,11 @@ function drawBackground(time) {
   ctx.fillRect(-30, -30, W + 60, H + 60);
 
   if (!zenMode) {
-    if (warmth > 0.5) {
-      ctx.fillStyle = `rgba(255,150,90,${(warmth - 0.5) * 0.22})`;
+    const wr = warmth / WARM_MAX;
+    if (wr > 0.5) {
+      ctx.fillStyle = `rgba(255,150,90,${(wr - 0.5) * 0.22})`;
     } else {
-      ctx.fillStyle = `rgba(90,170,255,${(0.5 - warmth) * 0.3})`;
+      ctx.fillStyle = `rgba(90,170,255,${(0.5 - wr) * 0.3})`;
     }
     ctx.fillRect(-30, -30, W + 60, H + 60);
   }
