@@ -46,7 +46,7 @@ const STATE = { MENU: 0, PLAYING: 1, OVER: 2, RPG: 3 };
 let state = STATE.MENU;
 let zenMode = false;
 
-const RPG_SCORE = 2000; // ВРЕМЕННО для теста (вернуть 100000!)
+const RPG_SCORE = 100000; // порог «природа зовёт» (тест: открой #rpg)
 let rpgTriggered = false; // чтобы сработало один раз за заход
 let round = 1; // номер захода (после унитаза +1)
 let rpg = null; // состояние мини-РПГ
@@ -244,11 +244,9 @@ function makeBubble(type) {
   };
 }
 
-// Прозрачность/масштаб пузыря по «проявлению» и «растворению».
+// Прозрачность пузыря: только «проявление» (растворения нет — лопается сам).
 function bubbleAlpha(b) {
-  const fin = Math.min(1, b.age / 0.4); // проявление
-  const fout = Math.min(1, (b.life - b.age) / 0.7); // растворение
-  return Math.max(0, Math.min(fin, fout));
+  return Math.min(1, b.age / 0.35);
 }
 
 function clamp(v, a, b) {
@@ -712,8 +710,28 @@ function popAt(px, py) {
   if (hit) {
     popBubble(hit, true);
   } else {
+    // Промах по воде — серия прерывается.
     ripples.push({ x: px, y: py, r: 8, max: 60, a: 0.5 });
+    breakCombo();
   }
+}
+
+// Сброс серии (промах или пузырь лопнул сам).
+function breakCombo() {
+  if (combo > 0) {
+    combo = 0;
+    comboTimer = 0;
+    comboEl.classList.remove("show");
+  }
+}
+
+// Пузырь лопается сам в конце жизни: анимация + сброс серии (без награды).
+function autoPop(b) {
+  b.pop = true;
+  spawnSplash(b.x, b.y, bubbleColor(b.type), 9);
+  ripples.push({ x: b.x, y: b.y, r: b.r * 0.5, max: b.r * 1.9, a: 0.45 });
+  pluck(150, 0.12, 0.05, "triangle"); // тихий «пшик»
+  breakCombo();
 }
 
 function gainScore(base, x, y, color) {
@@ -989,8 +1007,11 @@ function update(dt) {
     if (b.y < b.r + 64) { b.y = b.r + 64; b.vy = Math.abs(b.vy) * 0.6; }
     if (b.y > H - b.r) { b.y = H - b.r; b.vy = -Math.abs(b.vy) * 0.6; }
   }
-  // Убираем лопнутые и «растворившиеся» (отжившие свой срок).
-  bubbles = bubbles.filter((b) => !b.pop && b.age < b.life);
+  // Отжившие свой срок — лопаются сами (анимация + сброс серии).
+  for (const b of bubbles) {
+    if (!b.pop && b.age >= b.life) autoPop(b);
+  }
+  bubbles = bubbles.filter((b) => !b.pop);
 
   // Частицы.
   for (const p of particles) {
@@ -1137,8 +1158,12 @@ const EMOJI = { duck: "🦆", warm: "🔥", bomb: "💣", rainbow: "🌈", ice: 
 
 function drawBubble(b) {
   const col = bubbleColor(b.type);
-  const a = bubbleAlpha(b); // проявление/растворение
-  const sc = 0.7 + 0.3 * a; // лёгкий «поп» при появлении
+  const a0 = bubbleAlpha(b); // проявление
+  let a = a0;
+  // За ~1 сек до само-лопания пузырь мигает — предупреждение.
+  const left = b.life - b.age;
+  if (left < 1.0) a *= 0.45 + 0.55 * Math.abs(Math.sin(b.age * 16));
+  const sc = 0.7 + 0.3 * a0; // «поп» только при появлении (мигание не масштабирует)
   ctx.save();
   ctx.globalAlpha = a;
   ctx.translate(b.x, b.y);
