@@ -228,6 +228,16 @@ function startGame(zen) {
   hud.classList.remove("hidden");
   startScreen.classList.add("hidden");
   endScreen.classList.add("hidden");
+
+  // Стартовый «подарок»: сразу наполняем экран пузырями (с тёплыми),
+  // чтобы было чем прогреться, пока вода ещё не остыла.
+  for (let i = 0; i < 7; i++) {
+    const b = makeBubble(i % 2 === 0 ? "warm" : "normal");
+    b.x = rand(b.r, W - b.r);
+    b.y = rand(H * 0.3, H * 0.9);
+    bubbles.push(b);
+  }
+
   updateWarmthUI();
 }
 
@@ -472,7 +482,7 @@ function update(dt) {
   const lev = curLevel - 1;
 
   // Спавн пузырей — гуще с уровнем.
-  const spawnEvery = Math.max(0.12, 0.5 - lev * 0.03);
+  const spawnEvery = Math.max(0.12, 0.4 - lev * 0.025);
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTimer = spawnEvery;
@@ -497,7 +507,7 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    warmth -= dt * (0.14 + lev * 0.015); // стынет быстрее с уровнем
+    warmth -= dt * (0.08 + lev * 0.02); // мягко на старте, резвее с уровнем
     if (warmth <= 0) {
       warmth = 0;
       updateWarmthUI();
