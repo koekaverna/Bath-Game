@@ -47,8 +47,10 @@ let ripples = [];
 let popups = []; // летящие цифры очков
 let embers = []; // искры огня на высоких уровнях
 
-// Тетрис-подобная сложность: уровень растёт от очков.
-const POINTS_PER_LEVEL = 80;
+// Тетрис-подобная сложность: уровень растёт от очков по корню
+// (ранние уровни близко, верхние — всё дороже), с потолком MAX_LEVEL.
+// Порог уровня L: LEVEL_K * (L-1)^2  →  L12 ≈ 5445 очков.
+const LEVEL_K = 45;
 const MAX_LEVEL = 12; // на этом уровне фон и огонь на максимуме
 let curLevel = 1;
 let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
@@ -472,7 +474,10 @@ function update(dt) {
   elapsed += dt;
 
   // --- Уровень и сложность (как в тетрисе: от очков) ---
-  const newLevel = 1 + Math.floor(score / POINTS_PER_LEVEL);
+  const newLevel = Math.min(
+    MAX_LEVEL,
+    1 + Math.floor(Math.sqrt(score / LEVEL_K))
+  );
   if (newLevel !== curLevel) {
     if (newLevel > curLevel) {
       // Левел-ап: вспышка, толчок, мем.
