@@ -1248,9 +1248,25 @@ document.getElementById("again-btn").addEventListener("click", () => {
   startGame(zenMode);
 });
 document.getElementById("rpg-go-btn").addEventListener("click", () => {
+  initAudio();
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   rpgIntro.classList.add("hidden");
   if (rpg) rpg.phase = "walk";
 });
 document.getElementById("rpg-back-btn").addEventListener("click", () => {
   resumeBath();
 });
+
+// Прямая ссылка на туалет-уровень для теста: добавь #rpg к адресу.
+function maybeDirectRPG() {
+  const q = (location.hash + " " + location.search).toLowerCase();
+  if (q.includes("rpg") || q.includes("toilet") || q.includes("unitaz")) {
+    round = 1;
+    score = 100000;
+    scoreEl.textContent = score;
+    startScreen.classList.add("hidden");
+    endScreen.classList.add("hidden");
+    triggerRPG();
+  }
+}
+maybeDirectRPG();
