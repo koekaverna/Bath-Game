@@ -13,6 +13,7 @@ const hud = document.getElementById("hud");
 const scoreEl = document.getElementById("score");
 const comboEl = document.getElementById("combo");
 const warmthFill = document.getElementById("warmth-fill");
+const levelEl = document.getElementById("level");
 const startScreen = document.getElementById("start-screen");
 const endScreen = document.getElementById("end-screen");
 const finalScoreEl = document.getElementById("final-score");
@@ -44,6 +45,13 @@ let bubbles = [];
 let particles = [];
 let ripples = [];
 let popups = []; // летящие цифры очков
+let embers = []; // искры огня на высоких уровнях
+
+// Тетрис-подобная сложность: уровень растёт от очков.
+const POINTS_PER_LEVEL = 80;
+const MAX_LEVEL = 12; // на этом уровне фон и огонь на максимуме
+let curLevel = 1;
+let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
 
 let score = 0;
 let warmth = 1; // 0..1
@@ -175,6 +183,24 @@ function rand(a, b) {
   return a + Math.random() * (b - a);
 }
 
+// Линейная интерполяция между двумя hex-цветами -> "rgb(...)".
+function lerpColor(a, b, t) {
+  const ar = parseInt(a.slice(1, 3), 16);
+  const ag = parseInt(a.slice(3, 5), 16);
+  const ab = parseInt(a.slice(5, 7), 16);
+  const br = parseInt(b.slice(1, 3), 16);
+  const bg = parseInt(b.slice(3, 5), 16);
+  const bb = parseInt(b.slice(5, 7), 16);
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+// Палитры воды: спокойствие -> паника.
+const CALM = ["#1f9bb3", "#11697f", "#0a3d4d"];
+const PANIC = ["#e0662e", "#a32a18", "#3d0a04"];
+
 /* ---------------- Запуск / конец ---------------- */
 function startGame(zen) {
   zenMode = zen;
@@ -183,6 +209,10 @@ function startGame(zen) {
   particles = [];
   ripples = [];
   popups = [];
+  embers = [];
+  curLevel = 1;
+  panic = 0;
+  levelEl.textContent = "уровень 1";
   score = 0;
   warmth = 1;
   combo = 0;
@@ -424,14 +454,31 @@ function update(dt) {
 
   elapsed += dt;
 
-  // Спавн пузырей — густо, экран полон.
-  const spawnEvery = Math.max(0.14, 0.5 - elapsed * 0.005);
+  // --- Уровень и сложность (как в тетрисе: от очков) ---
+  const newLevel = 1 + Math.floor(score / POINTS_PER_LEVEL);
+  if (newLevel !== curLevel) {
+    if (newLevel > curLevel) {
+      // Левел-ап: вспышка, толчок, мем.
+      addPopup(W / 2, H * 0.32, "УРОВЕНЬ " + newLevel, "#fff");
+      addFlash("rgba(255,255,255,0.4)");
+      shake = Math.min(shake + 8, 16);
+      pluck(520 + newLevel * 30, 0.3, 0.16, "triangle");
+    }
+    curLevel = newLevel;
+    levelEl.textContent = "уровень " + curLevel;
+  }
+  // Прогресс «накала» 0..1 (плавно к панике/огню).
+  panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
+  const lev = curLevel - 1;
+
+  // Спавн пузырей — гуще с уровнем.
+  const spawnEvery = Math.max(0.12, 0.5 - lev * 0.03);
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTimer = spawnEvery;
     bubbles.push(makeBubble());
-    if (Math.random() > 0.4) bubbles.push(makeBubble());
-    if (elapsed > 18 && Math.random() > 0.55) bubbles.push(makeBubble());
+    if (Math.random() > 0.4 - lev * 0.02) bubbles.push(makeBubble());
+    if (lev >= 2 && Math.random() > 0.55) bubbles.push(makeBubble());
   }
 
   // Волна пузырей — иногда всплывает целый рой.
@@ -450,7 +497,7 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    warmth -= dt * 0.16;
+    warmth -= dt * (0.14 + lev * 0.015); // стынет быстрее с уровнем
     if (warmth <= 0) {
       warmth = 0;
       updateWarmthUI();
@@ -469,11 +516,12 @@ function update(dt) {
     }
   }
 
-  // Пузыри.
+  // Пузыри (поднимаются быстрее с уровнем).
+  const riseMul = 1 + lev * 0.09;
   for (const b of bubbles) {
     b.phase += sdt * b.wobble;
     b.x += (b.drift + Math.sin(b.phase) * 14) * sdt;
-    b.y += b.vy * sdt;
+    b.y += b.vy * sdt * riseMul;
     if (b.x < b.r) b.x = b.r;
     if (b.x > W - b.r) b.x = W - b.r;
   }
@@ -503,6 +551,28 @@ function update(dt) {
   }
   ripples = ripples.filter((r) => r.a > 0);
 
+  // Искры огня (появляются с накалом).
+  if (panic > 0.35) {
+    const rate = (panic - 0.35) * 60; // искр в секунду
+    if (Math.random() < rate * dt) {
+      embers.push({
+        x: rand(0, W),
+        y: H + 6,
+        vx: rand(-20, 20),
+        vy: -rand(60, 160) * (0.6 + panic),
+        r: rand(1.5, 4),
+        life: 1,
+      });
+    }
+  }
+  for (const e of embers) {
+    e.x += e.vx * dt;
+    e.y += e.vy * dt;
+    e.vy *= 0.99;
+    e.life -= dt * 0.6;
+  }
+  embers = embers.filter((e) => e.life > 0 && e.y > -10);
+
   // Тряска и вспышка затухают.
   shake *= Math.max(0, 1 - dt * 6);
   if (flash) {
@@ -519,10 +589,11 @@ function update(dt) {
 
 /* ---------------- Отрисовка ---------------- */
 function drawBackground(time) {
+  // Цвет воды плавно дрейфует от спокойного к паническому с уровнем.
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#1f9bb3");
-  g.addColorStop(0.5, "#11697f");
-  g.addColorStop(1, "#0a3d4d");
+  g.addColorStop(0, lerpColor(CALM[0], PANIC[0], panic));
+  g.addColorStop(0.5, lerpColor(CALM[1], PANIC[1], panic));
+  g.addColorStop(1, lerpColor(CALM[2], PANIC[2], panic));
   ctx.fillStyle = g;
   ctx.fillRect(-30, -30, W + 60, H + 60);
 
@@ -549,6 +620,51 @@ function drawBackground(time) {
     ctx.fill();
   }
   ctx.globalCompositeOperation = "source-over";
+}
+
+// Огонь у нижней кромки: разгорается с накалом (panic).
+function drawFire(time) {
+  if (panic <= 0.2) return;
+  const intensity = (panic - 0.2) / 0.8; // 0..1
+  const baseH = H * (0.08 + intensity * 0.28);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  // Свечение у дна.
+  const glow = ctx.createLinearGradient(0, H, 0, H - baseH * 1.4);
+  glow.addColorStop(0, `rgba(255,140,40,${0.55 * intensity})`);
+  glow.addColorStop(0.5, `rgba(255,70,20,${0.3 * intensity})`);
+  glow.addColorStop(1, "rgba(255,40,10,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, H - baseH * 1.4, W, baseH * 1.4);
+
+  // Языки пламени в два слоя (оранжевый снаружи, жёлтый внутри).
+  const step = Math.max(28, W / 16);
+  for (let layer = 0; layer < 2; layer++) {
+    const col = layer === 0 ? "rgba(255,90,25," : "rgba(255,200,60,";
+    const hMul = layer === 0 ? 1 : 0.6;
+    const wMul = layer === 0 ? 1 : 0.6;
+    ctx.fillStyle = col + (0.6 * intensity).toFixed(2) + ")";
+    for (let x = 0; x <= W + step; x += step) {
+      const flick =
+        0.55 +
+        0.45 *
+          Math.abs(
+            Math.sin(time * 0.006 + x * 0.05 + layer) *
+              Math.cos(time * 0.009 + x * 0.02)
+          );
+      const fh = baseH * hMul * flick;
+      const w = step * 0.62 * wMul;
+      ctx.beginPath();
+      ctx.moveTo(x - w, H + 4);
+      ctx.quadraticCurveTo(x - w * 0.3, H - fh * 0.5, x, H - fh);
+      ctx.quadraticCurveTo(x + w * 0.3, H - fh * 0.5, x + w, H + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 const EMOJI = { duck: "🦆", warm: "🔥", bomb: "💣", rainbow: "🌈", star: "⭐" };
@@ -618,6 +734,22 @@ function render(time) {
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Огонь и искры (на высоких уровнях).
+  drawFire(time);
+  if (embers.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    for (const e of embers) {
+      ctx.globalAlpha = Math.max(0, e.life);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffcf6b";
+      ctx.fill();
+    }
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 

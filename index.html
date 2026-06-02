@@ -12,7 +12,7 @@
   <meta name="description" content="Тёплая Ванна — расслабляющая игра для тех, кто лежит в ванной. Лопай пузыри одним пальцем." />
   <title>🛁 Тёплая Ванна</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
   <div id="app">
@@ -23,6 +23,7 @@
       <div class="hud-score">
         <span class="hud-label">очки</span>
         <span id="score">0</span>
+        <span id="level" class="hud-level">уровень 1</span>
       </div>
       <div class="hud-combo" id="combo"></div>
       <div class="hud-warmth">
@@ -42,6 +43,7 @@
           <li>🔥 Красные греют воду · 🦆 уточка — бонус</li>
           <li>💣 Бомба рвёт всё вокруг · 🌈 сметает экран</li>
           <li>⭐ Звезда замедляет время · 🌊 лови волны</li>
+          <li>📈 Больше очков — выше уровень и жарче 🔥</li>
           <li>🧊 Не дай воде остыть</li>
         </ul>
         <button id="start-btn" class="big-btn">Залезть в ванну</button>
@@ -64,6 +66,6 @@
     </section>
   </div>
 
-  <script src="game.js?v=7"></script>
+  <script src="game.js?v=8"></script>
 </body>
 </html>
