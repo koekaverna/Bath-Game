@@ -743,6 +743,12 @@ function gainScore(base, x, y, color) {
   score += g;
   scoreEl.textContent = score;
   addPopup(x, y, "+" + g, color);
+  // Комбо греет: каждый пузырь в серии чуть подогревает воду
+  // (тем сильнее, чем длиннее серия). Срыв комбо — тепло сразу падает.
+  if (combo > 1) {
+    warmth = Math.min(WARM_MAX, warmth + Math.min(0.35, combo * 0.025));
+    updateWarmthUI();
+  }
   return g;
 }
 
