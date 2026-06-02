@@ -769,7 +769,7 @@ function popBubble(b, byTap) {
 
   switch (b.type) {
     case "warm":
-      warmth = Math.min(WARM_MAX, warmth + 3.0); // редкий, но мощный глоток тепла
+      warmth = Math.min(WARM_MAX, warmth + 5.0); // редкий, но половина бака за раз
       gainScore(1, b.x, b.y, "#ffd0b0");
       pluck(520, 0.22, 0.16);
       break;
@@ -984,7 +984,7 @@ function update(dt) {
   if (!zenMode) {
     // Первые 5 секунд — «разгон»: вода ещё не стынет.
     // Бак большой (WARM_MAX), поэтому и слив крупнее.
-    const drain = elapsed < 5 ? 0 : 0.45 + panic * 2.2;
+    const drain = elapsed < 5 ? 0 : 0.4 + panic * 2.0;
     warmth -= dt * drain;
     if (warmth <= 0) {
       warmth = 0;
