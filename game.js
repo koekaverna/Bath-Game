@@ -155,6 +155,46 @@ function boom() {
   osc.start(t);
   osc.stop(t + 0.4);
 }
+// «Бульк»: журчащий нисходящий звук + шипение смыва.
+function flush() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  for (let i = 0; i < 5; i++) {
+    const t = t0 + i * 0.085;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = "sine";
+    const f = 640 - i * 80 + Math.random() * 50;
+    osc.frequency.setValueAtTime(f, t);
+    osc.frequency.exponentialRampToValueAtTime(f * 0.5, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.16);
+  }
+  // шипение слива
+  const dur = 0.55;
+  const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  const nf = audioCtx.createBiquadFilter();
+  nf.type = "bandpass";
+  nf.frequency.value = 850;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0 + 0.32);
+  ng.gain.exponentialRampToValueAtTime(0.13, t0 + 0.38);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32 + dur);
+  noise.connect(nf).connect(ng).connect(audioCtx.destination);
+  noise.start(t0 + 0.32);
+  noise.stop(t0 + 0.32 + dur);
+}
+
 function initAudio() {
   if (audioCtx) return;
   try {
@@ -455,6 +495,7 @@ function updateRPG(dt) {
     if (rpg.sit >= 2.2) {
       rpg.phase = "done";
       rpgDoneScreen.classList.remove("hidden");
+      flush(); // бульк!
       haptic([10, 30, 10]);
     }
     return;
