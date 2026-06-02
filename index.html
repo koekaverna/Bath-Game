@@ -16,7 +16,10 @@
   <meta name="description" content="Тёплая Ванна — расслабляющая игра для тех, кто лежит в ванной. Лопай пузыри одним пальцем." />
   <title>🛁 Тёплая Ванна</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=16" />
+  <script>
+    // Грузим стиль со «штампом времени» — браузер всегда берёт свежий файл.
+    document.write('<link rel="stylesheet" href="style.css?t=' + Date.now() + '">');
+  </script>
 </head>
 <body>
   <div id="app">
@@ -70,6 +73,10 @@
     </section>
   </div>
 
-  <script src="game.js?v=16"></script>
+  <script>
+    // Грузим игровой код со «штампом времени»: всегда свежая версия,
+    // даже если сам index.html застрял в кэше телефона.
+    document.write('<script src="game.js?t=' + Date.now() + '"><\/script>');
+  </script>
 </body>
 </html>
