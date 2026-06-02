@@ -516,8 +516,8 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    // Первые 3 секунды — «разгон»: вода ещё не стынет.
-    const drain = elapsed < 3 ? 0 : 0.08 + lev * 0.02;
+    // Первые 5 секунд — «разгон»: вода ещё не стынет.
+    const drain = elapsed < 5 ? 0 : 0.06 + lev * 0.02;
     warmth -= dt * drain;
     if (warmth <= 0) {
       warmth = 0;
