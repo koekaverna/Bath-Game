@@ -396,30 +396,24 @@ function explode(x, y, radius) {
   }
 }
 
-// Радуга сметает все пузыри и СОБИРАЕТ их бонусы (тепло + очки).
+// Радуга АКТИВИРУЕТ каждый пузырь на экране — со всеми его эффектами
+// (бомбы детонируют цепями, звёзды дают слоумо, тёплые отдают тепло).
 function rainbowSweep() {
-  const toPop = bubbles.filter((b) => !b.pop);
-  let bonus = 0;
-  let warmGain = 0.1; // базовый бонус самой радуги
-  for (const b of toPop) {
-    b.pop = true;
-    spawnSplash(b.x, b.y, bubbleColor(b.type), 10);
-    if (b.type === "duck") {
-      bonus += 10;
-      warmGain += 0.06;
-    } else if (b.type === "warm") {
-      bonus += 1;
-      warmGain += 0.14; // тепло с каждого тёплого
+  warmth = Math.min(1, warmth + 0.1); // базовый бонус самой радуги
+  const snapshot = bubbles.filter((b) => !b.pop);
+  for (const b of snapshot) {
+    if (b.pop) continue; // мог лопнуть от цепного взрыва по ходу
+    if (b.type === "rainbow") {
+      // вторую радугу не зацикливаем — просто очки и брызги
+      b.pop = true;
+      spawnSplash(b.x, b.y, bubbleColor(b.type), 12);
+      score += 5;
+      scoreEl.textContent = score;
     } else {
-      bonus += 2;
+      popBubble(b, false); // полный эффект пузыря
     }
   }
-  if (bonus > 0) {
-    score += bonus;
-    scoreEl.textContent = score;
-    addPopup(W / 2, H * 0.4, "🌈 +" + bonus, "#fff");
-  }
-  warmth = Math.min(1, warmth + warmGain);
+  addPopup(W / 2, H * 0.4, "🌈 всё разом!", "#fff");
 }
 
 function pointerHandler(e) {
