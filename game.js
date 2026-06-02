@@ -404,34 +404,35 @@ function roundRect(x, y, w, h, r) {
 }
 
 function buildRPG() {
-  const m = Math.min(W, H);
-  const bw = Math.min(W * 0.52, 280);
+  // Ванна — крупная (в неё помещается человек), унитаз — чуть больше человека.
+  const bw = Math.min(W * 0.62, 300);
   const bh = bw * 0.6;
-  const bath = { x: W * 0.5 - bw / 2, y: 80, w: bw, h: bh };
-  const tw = m * 0.18;
-  const toilet = { x: W * 0.72 - tw / 2, y: H - tw * 1.7 - 50, w: tw, h: tw * 1.7 };
+  const bath = { x: W * 0.5 - bw / 2, y: 90, w: bw, h: bh };
+  const tw = 84;
+  const th = 100;
+  const toilet = { x: W * 0.74 - tw / 2, y: H - th - 90, w: tw, h: th };
 
   // Лужи: пара у самой ванны + несколько по полу.
   const puddles = [
-    { x: bath.x + bw * 0.25, y: bath.y + bh + 55, r: rand(36, 52) },
-    { x: bath.x + bw * 0.78, y: bath.y + bh + 80, r: rand(36, 52) },
+    { x: bath.x + bw * 0.25, y: bath.y + bh + 55, r: rand(34, 50) },
+    { x: bath.x + bw * 0.78, y: bath.y + bh + 80, r: rand(34, 50) },
   ];
   for (let i = 0; i < 4; i++) {
     puddles.push({
-      x: rand(60, W - 60),
+      x: rand(55, W - 55),
       y: rand(bath.y + bh + 150, toilet.y - 70),
-      r: rand(30, 54),
+      r: rand(28, 48),
     });
   }
 
   const px = W * 0.5;
-  const py = bath.y + bh + 28;
+  const py = bath.y + bh + 34;
   rpg = {
     phase: "intro",
     bath,
     toilet,
     puddles,
-    player: { x: px, y: py, tx: px, ty: py, r: 22, speed: 230 },
+    player: { x: px, y: py, tx: px, ty: py, r: 26, speed: 240 },
     sit: 0,
     t: 0,
   };
@@ -458,6 +459,12 @@ function updateRPG(dt) {
     }
     return;
   }
+  // Анимация подскальзывания: крутимся, «БУМ», потом конец.
+  if (rpg.phase === "slip") {
+    rpg.slipT += dt;
+    if (rpg.slipT >= 1.15) endGame("slip");
+    return;
+  }
   if (rpg.phase !== "walk") return;
 
   const p = rpg.player;
@@ -470,10 +477,15 @@ function updateRPG(dt) {
     p.y += (dy / d) * step;
   }
 
-  // Поскользнулся на луже → конец.
+  // Наступил на лужу → подскальзывание (хардкор, без предупреждений).
   for (const pd of rpg.puddles) {
     if (Math.hypot(p.x - pd.x, p.y - pd.y) < pd.r + p.r * 0.4) {
-      endGame("slip");
+      rpg.phase = "slip";
+      rpg.slipT = 0;
+      rpg.slipX = p.x;
+      rpg.slipY = p.y;
+      haptic([50, 40, 90]);
+      boom();
       return;
     }
   }
@@ -546,7 +558,7 @@ function renderRPG(time) {
   roundRect(b.x + 16, b.y + 16, b.w - 32, b.h - 32, 22);
   ctx.fillStyle = "#7fd0e0";
   ctx.fill();
-  ctx.font = "26px serif";
+  ctx.font = `${Math.round(b.h * 0.6)}px serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("🛁", b.x + b.w / 2, b.y + b.h / 2);
@@ -568,7 +580,7 @@ function renderRPG(time) {
 
   // Унитаз.
   const t = rpg.toilet;
-  ctx.font = `${t.w * 1.5}px serif`;
+  ctx.font = `${Math.round(t.h)}px serif`;
   ctx.fillText("🚽", t.x + t.w / 2, t.y + t.h / 2);
 
   // Цель (куда тапнул).
@@ -582,15 +594,40 @@ function renderRPG(time) {
   }
 
   // Игрок.
-  ctx.font = `${p.r * 2.2}px serif`;
-  ctx.fillText(rpg.phase === "sitting" ? "🧎" : "🧍", p.x, p.y - p.r * 0.4);
+  if (rpg.phase === "slip") {
+    // Подскальзывание: человечек крутится и разлетается «звёздочками».
+    const k = Math.min(1, rpg.slipT / 1.15);
+    ctx.save();
+    ctx.translate(rpg.slipX, rpg.slipY);
+    ctx.rotate(rpg.slipT * 14); // быстрое вращение
+    ctx.font = `${p.r * 2.4}px serif`;
+    ctx.fillText("🤸", 0, 0);
+    ctx.restore();
+    // вспышка-«бум»
+    if (rpg.slipT < 0.5) {
+      ctx.save();
+      ctx.globalAlpha = 1 - rpg.slipT * 2;
+      ctx.font = "900 64px -apple-system, sans-serif";
+      ctx.fillStyle = "#ff5a2a";
+      ctx.fillText("БУМ!", rpg.slipX, rpg.slipY - p.r * 2.2);
+      ctx.restore();
+    }
+    // «звёздочки» по кругу
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI * 2 * i) / 6 + rpg.slipT * 4;
+      const rr = 30 + k * 50;
+      ctx.font = "26px serif";
+      ctx.fillText("💫", rpg.slipX + Math.cos(a) * rr, rpg.slipY + Math.sin(a) * rr);
+    }
+  } else {
+    ctx.font = `${Math.round(p.r * 2.4)}px serif`;
+    ctx.fillText(rpg.phase === "sitting" ? "🧎" : "🧍", p.x, p.y - p.r * 0.4);
+  }
 
-  // Текст-подсказка / прогресс.
+  // Прогресс «дел» (без подсказок про лужи — хардкор).
   ctx.fillStyle = "#2b4750";
   ctx.font = "700 20px -apple-system, sans-serif";
-  if (rpg.phase === "walk") {
-    ctx.fillText("Дойди до 🚽, обходи лужи!", W / 2, H - 24);
-  } else if (rpg.phase === "sitting") {
+  if (rpg.phase === "sitting") {
     ctx.fillText("Делаем дела… " + Math.ceil(2.2 - rpg.sit) + "с", W / 2, H - 24);
   }
 }
