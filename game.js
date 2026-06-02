@@ -145,12 +145,12 @@ function haptic(ms) {
    bomb   — цепной взрыв. rainbow — смести всё. star — замедление.        */
 function pickType() {
   const r = Math.random();
-  if (r > 0.975) return "rainbow"; // 2.5%
-  if (r > 0.93) return "star"; // 4.5%
-  if (r > 0.85) return "bomb"; // 8%
-  if (r > 0.77) return "duck"; // 8%
-  if (r > 0.52) return "warm"; // 25%
-  return "normal"; // 52%
+  if (r > 0.99) return "rainbow"; // 1% — редко
+  if (r > 0.955) return "star"; // 3.5%
+  if (r > 0.925) return "bomb"; // 3% — редко
+  if (r > 0.85) return "duck"; // 7.5%
+  if (r > 0.5) return "warm"; // 35% — больше тепла, вода стынет быстро
+  return "normal"; // 50%
 }
 
 function makeBubble(type) {
@@ -163,7 +163,7 @@ function makeBubble(type) {
     y: H + r + rand(0, 40),
     r,
     type,
-    vy: -rand(28, 56) * (type === "duck" ? 0.7 : 1),
+    vy: -rand(20, 40) * (type === "duck" ? 0.7 : 1),
     drift: rand(-18, 18),
     phase: Math.random() * Math.PI * 2,
     wobble: rand(0.6, 1.4),
@@ -424,13 +424,14 @@ function update(dt) {
 
   elapsed += dt;
 
-  // Спавн пузырей (темп плавно растёт).
-  const spawnEvery = Math.max(0.32, 0.95 - elapsed * 0.006);
+  // Спавн пузырей — густо, экран полон.
+  const spawnEvery = Math.max(0.14, 0.5 - elapsed * 0.005);
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTimer = spawnEvery;
     bubbles.push(makeBubble());
-    if (elapsed > 25 && Math.random() > 0.6) bubbles.push(makeBubble());
+    if (Math.random() > 0.4) bubbles.push(makeBubble());
+    if (elapsed > 18 && Math.random() > 0.55) bubbles.push(makeBubble());
   }
 
   // Волна пузырей — иногда всплывает целый рой.
@@ -449,7 +450,7 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    warmth -= dt * 0.1;
+    warmth -= dt * 0.16;
     if (warmth <= 0) {
       warmth = 0;
       updateWarmthUI();
