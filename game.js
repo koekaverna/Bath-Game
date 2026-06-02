@@ -145,12 +145,12 @@ function haptic(ms) {
    bomb   — цепной взрыв. rainbow — смести всё. star — замедление.        */
 function pickType() {
   const r = Math.random();
-  if (r > 0.985) return "rainbow"; // очень редкий
-  if (r > 0.95) return "star";
-  if (r > 0.9) return "bomb";
-  if (r > 0.86) return "duck";
-  if (r > 0.6) return "warm";
-  return "normal";
+  if (r > 0.975) return "rainbow"; // 2.5%
+  if (r > 0.93) return "star"; // 4.5%
+  if (r > 0.85) return "bomb"; // 8%
+  if (r > 0.77) return "duck"; // 8%
+  if (r > 0.52) return "warm"; // 25%
+  return "normal"; // 52%
 }
 
 function makeBubble(type) {
@@ -280,7 +280,7 @@ function popBubble(b, byTap) {
       comboEl.textContent = praise + "×" + combo;
       comboEl.classList.add("show");
     }
-    if (combo > 0 && combo % 12 === 0) triggerCameo(); // мем за жирное комбо
+    if (combo > 0 && combo % 8 === 0) triggerCameo(); // мем за комбо
   }
 
   const col = bubbleColor(b.type);
@@ -301,6 +301,7 @@ function popBubble(b, byTap) {
       pluck(880, 0.3, 0.2);
       pluck(660, 0.3, 0.14);
       haptic([10, 30, 10]);
+      triggerCameo();
       break;
 
     case "bomb":
