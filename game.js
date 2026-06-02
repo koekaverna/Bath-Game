@@ -155,15 +155,17 @@ function haptic(ms) {
 
 /* ---------------- Типы пузырей ----------------
    normal — очки. warm — греет воду. duck — бонус.
-   bomb   — цепной взрыв. rainbow — смести всё. star — замедление.        */
+   bomb   — цепной взрыв. rainbow — активирует всё. ice — морозит.        */
 function pickType() {
   const r = Math.random();
   if (r > 0.99933) return "rainbow"; // ~0.07% — в 15 раз реже
   if (r > 0.988) return "ice"; // ~1.1% — льдинка (морозит), стала реже
   if (r > 0.982) return "bomb"; // ~0.6% — в 5 раз реже и слабее
   if (r > 0.9) return "duck"; // ~8.2%
-  if (r > 0.5) return "warm"; // ~40% — тепло
-  return "normal"; // ~50%
+  // Чем выше накал, тем больше тёплых: ~40% → ~62% (греться в пекле).
+  const warmCut = 0.5 - panic * 0.22;
+  if (r > warmCut) return "warm";
+  return "normal";
 }
 
 function makeBubble(type) {
@@ -544,7 +546,7 @@ function update(dt) {
   }
 
   // Пузыри (поднимаются быстрее с уровнем).
-  const riseMul = 1 + lev * 0.09;
+  const riseMul = 1 + lev * 0.06; // мягче, чтобы пузыри дольше держались
   for (const b of bubbles) {
     b.phase += sdt * b.wobble;
     b.x += (b.drift + Math.sin(b.phase) * 14) * sdt;
