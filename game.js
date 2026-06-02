@@ -220,9 +220,9 @@ function pickType() {
   if (r > 0.99933) return "rainbow"; // ~0.07%
   if (r > 0.994) return "bomb"; // ~0.6% — редкая и слабая
   if (r > 0.92) return "duck"; // ~7.4%
-  // Чем выше накал, тем больше тёплых: ~42% → ~66% (греться в пекле).
-  const warmCut = 0.5 - panic * 0.24;
-  if (r > warmCut) return "warm";
+  // Огоньки (тёплые) — в ~5 раз реже прежнего: редкие, но мощные.
+  const warmChance = 0.09 + panic * 0.05; // ~9% → ~14% от остатка
+  if (Math.random() < warmChance) return "warm";
   return "normal";
 }
 
@@ -769,7 +769,7 @@ function popBubble(b, byTap) {
 
   switch (b.type) {
     case "warm":
-      warmth = Math.min(WARM_MAX, warmth + 0.8);
+      warmth = Math.min(WARM_MAX, warmth + 3.0); // редкий, но мощный глоток тепла
       gainScore(1, b.x, b.y, "#ffd0b0");
       pluck(520, 0.22, 0.16);
       break;
@@ -807,9 +807,10 @@ function popBubble(b, byTap) {
       break;
 
     case "ice":
-      // Льдинка остужает воду (не трогать!). Очков не даёт.
+      // Льдинка остужает воду, не даёт очков и обнуляет комбо (не трогать!).
       warmth = Math.max(0, warmth - 1.6);
-      addPopup(b.x, b.y - 26, "❄️ бррр! −тепло", "#9fd8ff");
+      breakCombo();
+      addPopup(b.x, b.y - 26, "❄️ бррр! комбо ×0", "#9fd8ff");
       addFlash("rgba(120,190,255,0.35)");
       pluck(220, 0.4, 0.14, "sine");
       updateWarmthUI();
