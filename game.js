@@ -46,7 +46,7 @@ const STATE = { MENU: 0, PLAYING: 1, OVER: 2, RPG: 3 };
 let state = STATE.MENU;
 let zenMode = false;
 
-const RPG_SCORE = 100000; // порог «природа зовёт»
+const RPG_SCORE = 2000; // ВРЕМЕННО для теста (вернуть 100000!)
 let rpgTriggered = false; // чтобы сработало один раз за заход
 let round = 1; // номер захода (после унитаза +1)
 let rpg = null; // состояние мини-РПГ
