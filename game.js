@@ -59,8 +59,8 @@ let embers = []; // искры огня на высоких уровнях
 
 // Тетрис-подобная сложность: уровень растёт от очков по корню
 // (ранние уровни близко, верхние — всё дороже), с потолком MAX_LEVEL.
-// Порог уровня L: LEVEL_K * (L-1)^2  →  L12 ≈ 5445 очков.
-const LEVEL_K = 45;
+// Порог уровня L: LEVEL_K * (L-1)^2  →  L12 ≈ 50 000 очков.
+const LEVEL_K = 413;
 const MAX_LEVEL = 12; // на этом уровне фон и огонь на максимуме
 let curLevel = 1;
 let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
@@ -68,8 +68,8 @@ let panic = 0; // 0 (спокойствие) .. 1 (паника + огонь)
 // Тепло воды: бак большой (вместимость ×10 от старого 0..1).
 const WARM_MAX = 10;
 
-// Лимит пузырей на экране — меньше, легче уследить за всеми.
-const MAX_BUBBLES = 11;
+// Лимит пузырей на экране — растёт с уровнем (пересчёт в update).
+let curMaxBubbles = 9;
 
 let score = 0;
 let warmth = WARM_MAX; // 0..WARM_MAX
@@ -209,15 +209,19 @@ function haptic(ms) {
 
 /* ---------------- Типы пузырей ----------------
    normal — очки. warm — греет воду. duck — бонус.
-   bomb   — цепной взрыв. rainbow — активирует всё. ice — морозит.        */
+   bomb — цепной взрыв. rainbow — активирует всё. ice — остужает воду.     */
 function pickType() {
+  // Льдинка ❄️ — только с 5-го уровня, к 12-му её становится много.
+  if (curLevel >= 5) {
+    const iceChance = 0.03 + ((curLevel - 5) / (MAX_LEVEL - 5)) * 0.27; // ~3% → ~30%
+    if (Math.random() < iceChance) return "ice";
+  }
   const r = Math.random();
-  if (r > 0.99933) return "rainbow"; // ~0.07% — в 15 раз реже
-  if (r > 0.988) return "ice"; // ~1.1% — льдинка (морозит), стала реже
-  if (r > 0.982) return "bomb"; // ~0.6% — в 5 раз реже и слабее
-  if (r > 0.9) return "duck"; // ~8.2%
-  // Чем выше накал, тем больше тёплых: ~40% → ~62% (греться в пекле).
-  const warmCut = 0.5 - panic * 0.22;
+  if (r > 0.99933) return "rainbow"; // ~0.07%
+  if (r > 0.994) return "bomb"; // ~0.6% — редкая и слабая
+  if (r > 0.92) return "duck"; // ~7.4%
+  // Чем выше накал, тем больше тёплых: ~42% → ~66% (греться в пекле).
+  const warmCut = 0.5 - panic * 0.24;
   if (r > warmCut) return "warm";
   return "normal";
 }
@@ -227,8 +231,8 @@ function makeBubble(type) {
   let r = rand(34, 62);
   if (type === "duck" || type === "rainbow") r = rand(50, 66);
   if (type === "bomb") r = rand(44, 58);
-  // Время жизни: короткое (лопаются чаще), на высоких уровнях ещё короче.
-  const life = Math.max(3, rand(5, 8) * (1 - panic * 0.4));
+  // Время жизни: ↓ с уровнем (на верхах надо реагировать быстрее).
+  const life = Math.max(2.8, rand(6, 9) * (1 - panic * 0.5));
   return {
     x: rand(r, W - r),
     y: rand(H * 0.16, H * 0.88), // по умолчанию — где угодно по экрану
@@ -253,11 +257,11 @@ function clamp(v, a, b) {
   return v < a ? a : v > b ? b : v;
 }
 
-const driftLevel = () => 1 + (curLevel - 1) * 0.12; // быстрее дрейф с уровнем
+const driftLevel = () => 1 + panic * 1.7; // скорость пузырей ↑ с уровнем
 
 // 1) Появление в случайном месте всего экрана + лёгкий дрейф.
 function spawnAnywhere(type) {
-  if (bubbles.length >= MAX_BUBBLES) return;
+  if (bubbles.length >= curMaxBubbles) return;
   const b = makeBubble(type);
   const s = driftLevel();
   b.vx = rand(-26, 26) * s;
@@ -267,7 +271,7 @@ function spawnAnywhere(type) {
 
 // 2) Форсунка: бьёт пузырём снизу вверх из своей точки.
 function spawnFromJet(j) {
-  if (bubbles.length >= MAX_BUBBLES) return;
+  if (bubbles.length >= curMaxBubbles) return;
   const b = makeBubble();
   b.x = clamp(j.x + rand(-18, 18), b.r, W - b.r);
   b.y = H - b.r - 8;
@@ -286,7 +290,7 @@ function initJets() {
 
 // 3) Узоры/волны: линия, кольцо, дуга, парад уток.
 function spawnPattern() {
-  const room = MAX_BUBBLES - bubbles.length;
+  const room = curMaxBubbles - bubbles.length;
   if (room < 3) return;
   const kind = ["line", "ring", "arc", "ducks"][Math.floor(Math.random() * 4)];
   const place = (x, y, type) => {
@@ -803,10 +807,12 @@ function popBubble(b, byTap) {
       break;
 
     case "ice":
-      gainScore(4, b.x, b.y, "#bfeefa");
-      timeScale = 0.32; // льдинка морозит — замедляет время
-      addPopup(b.x, b.y - 26, "❄️ холодок…", "#bfeefa");
-      pluck(300, 0.5, 0.16, "sine");
+      // Льдинка остужает воду (не трогать!). Очков не даёт.
+      warmth = Math.max(0, warmth - 1.6);
+      addPopup(b.x, b.y - 26, "❄️ бррр! −тепло", "#9fd8ff");
+      addFlash("rgba(120,190,255,0.35)");
+      pluck(220, 0.4, 0.14, "sine");
+      updateWarmthUI();
       break;
 
     default: // normal
@@ -930,9 +936,13 @@ function update(dt) {
     curLevel = newLevel;
     levelEl.textContent = "уровень " + curLevel;
   }
-  // Прогресс «накала» 0..1 (плавно к панике/огню).
+  // Прогресс «накала» 0..1 (плавно к панике/огню) — общий множитель сложности.
   panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
   const lev = curLevel - 1;
+  // Все рычаги сложности растут с уровнем через panic:
+  //   слив тепла, скорость/частота спавна, скорость пузырей, частота узоров,
+  //   короче жизнь, больше тёплых, и больше пузырей на экране ↓
+  curMaxBubbles = Math.round(9 + panic * 6); // 9 → 15
 
   // Природа зовёт: на пороге 100 000 (и кратных) — мини-РПГ к унитазу.
   if (!rpgTriggered && score >= RPG_SCORE * round) {
@@ -949,13 +959,13 @@ function update(dt) {
     if (Math.random() < dt * 0.25) j.vx = rand(-50, 50); // иногда меняет курс
     j.emit -= dt;
     if (j.emit <= 0) {
-      j.emit = Math.max(0.45, rand(0.9, 1.6) - lev * 0.04);
+      j.emit = Math.max(0.4, rand(0.9, 1.6) - panic * 0.95);
       spawnFromJet(j);
     }
   }
 
   // Заполнение «где угодно» — держим экран наполненным до лимита.
-  const spawnEvery = Math.max(0.25, 0.6 - lev * 0.025);
+  const spawnEvery = Math.max(0.18, 0.6 - panic * 0.42);
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTimer = spawnEvery;
@@ -965,7 +975,7 @@ function update(dt) {
   // Узоры/волны — со 2-го уровня, с ритмом и паузами.
   patternTimer -= dt;
   if (patternTimer <= 0) {
-    patternTimer = rand(7, 12);
+    patternTimer = Math.max(4, rand(7, 11) - panic * 4);
     if (curLevel >= 2) spawnPattern();
   }
 
@@ -973,7 +983,7 @@ function update(dt) {
   if (!zenMode) {
     // Первые 5 секунд — «разгон»: вода ещё не стынет.
     // Бак большой (WARM_MAX), поэтому и слив крупнее.
-    const drain = elapsed < 5 ? 0 : 0.5 + lev * 0.18;
+    const drain = elapsed < 5 ? 0 : 0.45 + panic * 2.2;
     warmth -= dt * drain;
     if (warmth <= 0) {
       warmth = 0;
