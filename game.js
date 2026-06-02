@@ -449,7 +449,7 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    warmth -= dt * 0.02;
+    warmth -= dt * 0.1;
     if (warmth <= 0) {
       warmth = 0;
       updateWarmthUI();
