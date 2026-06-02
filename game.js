@@ -157,8 +157,8 @@ function pickType() {
   if (r > 0.955) return "star"; // 3.5%
   if (r > 0.925) return "bomb"; // 3% — редко
   if (r > 0.85) return "duck"; // 7.5%
-  if (r > 0.5) return "warm"; // 35% — больше тепла, вода стынет быстро
-  return "normal"; // 50%
+  if (r > 0.46) return "warm"; // ~39% — больше тепла, вода стынет быстро
+  return "normal"; // ~46%
 }
 
 function makeBubble(type) {
@@ -329,7 +329,7 @@ function popBubble(b, byTap) {
 
   switch (b.type) {
     case "warm":
-      warmth = Math.min(1, warmth + 0.16);
+      warmth = Math.min(1, warmth + 0.22);
       gainScore(1, b.x, b.y, "#ffd0b0");
       pluck(520, 0.22, 0.16);
       break;
@@ -396,21 +396,30 @@ function explode(x, y, radius) {
   }
 }
 
-// Радуга сметает все пузыри волной снизу вверх.
+// Радуга сметает все пузыри и СОБИРАЕТ их бонусы (тепло + очки).
 function rainbowSweep() {
   const toPop = bubbles.filter((b) => !b.pop);
   let bonus = 0;
+  let warmGain = 0.1; // базовый бонус самой радуги
   for (const b of toPop) {
     b.pop = true;
-    bonus += 2;
     spawnSplash(b.x, b.y, bubbleColor(b.type), 10);
+    if (b.type === "duck") {
+      bonus += 10;
+      warmGain += 0.06;
+    } else if (b.type === "warm") {
+      bonus += 1;
+      warmGain += 0.14; // тепло с каждого тёплого
+    } else {
+      bonus += 2;
+    }
   }
   if (bonus > 0) {
     score += bonus;
     scoreEl.textContent = score;
     addPopup(W / 2, H * 0.4, "🌈 +" + bonus, "#fff");
   }
-  warmth = Math.min(1, warmth + 0.1);
+  warmth = Math.min(1, warmth + warmGain);
 }
 
 function pointerHandler(e) {
@@ -507,7 +516,9 @@ function update(dt) {
 
   // Остывание воды (в дзене не стынет).
   if (!zenMode) {
-    warmth -= dt * (0.08 + lev * 0.02); // мягко на старте, резвее с уровнем
+    // Первые 3 секунды — «разгон»: вода ещё не стынет.
+    const drain = elapsed < 3 ? 0 : 0.08 + lev * 0.02;
+    warmth -= dt * drain;
     if (warmth <= 0) {
       warmth = 0;
       updateWarmthUI();
