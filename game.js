@@ -66,7 +66,8 @@ let warmth = WARM_MAX; // 0..WARM_MAX
 let combo = 0;
 let comboTimer = 0;
 let spawnTimer = 0;
-let waveTimer = 8;
+let patternTimer = 9; // таймер узоров/волн
+let jets = []; // форсунки джакузи: {x, vx, emit}
 let lastTime = 0;
 let elapsed = 0;
 
@@ -176,17 +177,119 @@ function makeBubble(type) {
   let r = rand(34, 62);
   if (type === "duck" || type === "rainbow") r = rand(50, 66);
   if (type === "bomb") r = rand(44, 58);
+  // Время жизни: на высоких уровнях пузыри живут меньше (быстрее оборот).
+  const life = Math.max(4, rand(8, 12) * (1 - panic * 0.45));
   return {
     x: rand(r, W - r),
-    y: H + r + rand(0, 40),
+    y: rand(H * 0.16, H * 0.88), // по умолчанию — где угодно по экрану
     r,
     type,
-    vy: -rand(20, 40) * (type === "duck" ? 0.7 : 1),
-    drift: rand(-18, 18),
+    vx: 0,
+    vy: 0,
     phase: Math.random() * Math.PI * 2,
     wobble: rand(0.6, 1.4),
+    age: 0,
+    life,
     pop: false,
   };
+}
+
+// Прозрачность/масштаб пузыря по «проявлению» и «растворению».
+function bubbleAlpha(b) {
+  const fin = Math.min(1, b.age / 0.4); // проявление
+  const fout = Math.min(1, (b.life - b.age) / 0.7); // растворение
+  return Math.max(0, Math.min(fin, fout));
+}
+
+function clamp(v, a, b) {
+  return v < a ? a : v > b ? b : v;
+}
+
+const driftLevel = () => 1 + (curLevel - 1) * 0.12; // быстрее дрейф с уровнем
+
+// 1) Появление в случайном месте всего экрана + лёгкий дрейф.
+function spawnAnywhere(type) {
+  if (bubbles.length >= MAX_BUBBLES) return;
+  const b = makeBubble(type);
+  const s = driftLevel();
+  b.vx = rand(-26, 26) * s;
+  b.vy = rand(-26, 26) * s;
+  bubbles.push(b);
+}
+
+// 2) Форсунка: бьёт пузырём снизу вверх из своей точки.
+function spawnFromJet(j) {
+  if (bubbles.length >= MAX_BUBBLES) return;
+  const b = makeBubble();
+  b.x = clamp(j.x + rand(-18, 18), b.r, W - b.r);
+  b.y = H - b.r - 8;
+  b.vy = -rand(80, 150) * driftLevel();
+  b.vx = rand(-20, 20);
+  bubbles.push(b);
+}
+
+function initJets() {
+  jets = [];
+  const n = 2 + (Math.random() > 0.5 ? 1 : 0);
+  for (let i = 0; i < n; i++) {
+    jets.push({ x: rand(W * 0.15, W * 0.85), vx: rand(-50, 50), emit: rand(0.4, 1.2) });
+  }
+}
+
+// 3) Узоры/волны: линия, кольцо, дуга, парад уток.
+function spawnPattern() {
+  const room = MAX_BUBBLES - bubbles.length;
+  if (room < 3) return;
+  const kind = ["line", "ring", "arc", "ducks"][Math.floor(Math.random() * 4)];
+  const place = (x, y, type) => {
+    const b = makeBubble(type);
+    b.x = clamp(x, b.r, W - b.r);
+    b.y = clamp(y, b.r + 70, H - b.r);
+    b.vx = rand(-12, 12);
+    b.vy = rand(-12, 12);
+    bubbles.push(b);
+  };
+
+  if (kind === "line") {
+    const n = Math.min(6, room);
+    const y = rand(H * 0.3, H * 0.6);
+    for (let i = 0; i < n; i++) place((W / (n + 1)) * (i + 1), y);
+    addPopup(W / 2, H * 0.24, "〰️ линия!", "#bfeefa");
+  } else if (kind === "ring") {
+    const n = Math.min(8, room);
+    const cx = rand(W * 0.3, W * 0.7);
+    const cy = rand(H * 0.35, H * 0.6);
+    const rad = Math.min(W, H) * 0.18;
+    for (let i = 0; i < n; i++) {
+      const a = (Math.PI * 2 * i) / n;
+      place(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+    }
+    addPopup(cx, cy, "⭕ кольцо!", "#bfeefa");
+  } else if (kind === "arc") {
+    const n = Math.min(6, room);
+    const cx = W / 2;
+    const cy = H * 0.65;
+    const rad = Math.min(W, H) * 0.26;
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI + (Math.PI * i) / (n - 1);
+      place(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+    }
+    addPopup(cx, H * 0.3, "🌈 дуга!", "#bfeefa");
+  } else {
+    // парад уток: ряд уток едет поперёк
+    const n = Math.min(5, room);
+    const y = rand(H * 0.3, H * 0.55);
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    for (let i = 0; i < n; i++) {
+      const b = makeBubble("duck");
+      b.x = clamp(W / 2 + (i - n / 2) * 90, b.r, W - b.r);
+      b.y = y;
+      b.vx = 60 * dir;
+      b.vy = 0;
+      bubbles.push(b);
+    }
+    addPopup(W / 2, H * 0.24, "🦆 парад!", "#ffe27a");
+  }
 }
 
 function rand(a, b) {
@@ -228,7 +331,8 @@ function startGame(zen) {
   combo = 0;
   comboTimer = 0;
   spawnTimer = 0;
-  waveTimer = 8;
+  patternTimer = 6;
+  initJets();
   elapsed = 0;
   timeScale = 1;
   shake = 0;
@@ -239,13 +343,10 @@ function startGame(zen) {
   startScreen.classList.add("hidden");
   endScreen.classList.add("hidden");
 
-  // Стартовый «подарок»: сразу наполняем экран пузырями (с тёплыми),
-  // чтобы было чем прогреться, пока вода ещё не остыла.
-  for (let i = 0; i < 4; i++) {
-    const b = makeBubble(i % 2 === 0 ? "warm" : "normal");
-    b.x = rand(b.r, W - b.r);
-    b.y = rand(H * 0.35, H * 0.9);
-    bubbles.push(b);
+  // Стартовый «подарок»: сразу наполняем экран пузырями по всей площади
+  // (с тёплыми), чтобы было чем прогреться и экран не был пустым.
+  for (let i = 0; i < 9; i++) {
+    spawnAnywhere(i % 2 === 0 ? "warm" : null);
   }
 
   updateWarmthUI();
@@ -498,33 +599,33 @@ function update(dt) {
   panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
   const lev = curLevel - 1;
 
-  // Спавн пузырей: держим примерно постоянное число на экране (лимит),
-  // быстро добиваем до него на низких уровнях, без «стены» на верхних.
-  const spawnEvery = Math.max(0.18, 0.45 - lev * 0.02);
-  spawnTimer -= dt;
-  if (spawnTimer <= 0 && bubbles.length < MAX_BUBBLES) {
-    spawnTimer = spawnEvery;
-    bubbles.push(makeBubble());
-    // второй пузырь — чтобы быстрее восполнять после серий
-    if (Math.random() > 0.55 && bubbles.length < MAX_BUBBLES) {
-      bubbles.push(makeBubble());
+  // --- Режиссёр появления (всё сразу) ---
+  // Форсунки: двигаются по ширине и периодически бьют пузырём снизу.
+  for (const j of jets) {
+    j.x += j.vx * dt;
+    if (j.x < W * 0.1) { j.x = W * 0.1; j.vx = Math.abs(j.vx); }
+    if (j.x > W * 0.9) { j.x = W * 0.9; j.vx = -Math.abs(j.vx); }
+    if (Math.random() < dt * 0.25) j.vx = rand(-50, 50); // иногда меняет курс
+    j.emit -= dt;
+    if (j.emit <= 0) {
+      j.emit = Math.max(0.45, rand(0.9, 1.6) - lev * 0.04);
+      spawnFromJet(j);
     }
   }
 
-  // Волна — со 2-го уровня и только если экран не забит.
-  waveTimer -= dt;
-  if (waveTimer <= 0) {
-    waveTimer = rand(12, 20);
-    if (curLevel >= 2 && bubbles.length < MAX_BUBBLES - 5) {
-      const n = Math.min(5, MAX_BUBBLES - bubbles.length);
-      for (let i = 0; i < n; i++) {
-        const b = makeBubble("normal");
-        b.x = (W / (n + 1)) * (i + 1);
-        b.y = H + b.r + i * 30;
-        bubbles.push(b);
-      }
-      addPopup(W / 2, H * 0.3, "🌊 волна!", "#bfeefa");
-    }
+  // Заполнение «где угодно» — держим экран наполненным до лимита.
+  const spawnEvery = Math.max(0.25, 0.6 - lev * 0.025);
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) {
+    spawnTimer = spawnEvery;
+    spawnAnywhere();
+  }
+
+  // Узоры/волны — со 2-го уровня, с ритмом и паузами.
+  patternTimer -= dt;
+  if (patternTimer <= 0) {
+    patternTimer = rand(7, 12);
+    if (curLevel >= 2) spawnPattern();
   }
 
   // Остывание воды (в дзене не стынет).
@@ -551,16 +652,21 @@ function update(dt) {
     }
   }
 
-  // Пузыри (поднимаются быстрее с уровнем).
-  const riseMul = 1 + lev * 0.14; // быстрее с уровнем — труднее попасть
+  // Пузыри: свободный дрейф + лёгкое блуждание + мягкий отскок от краёв.
   for (const b of bubbles) {
+    b.age += dt;
     b.phase += sdt * b.wobble;
-    b.x += (b.drift + Math.sin(b.phase) * 14) * sdt;
-    b.y += b.vy * sdt * riseMul;
-    if (b.x < b.r) b.x = b.r;
-    if (b.x > W - b.r) b.x = W - b.r;
+    b.x += (b.vx + Math.sin(b.phase) * 10) * sdt;
+    b.y += (b.vy + Math.cos(b.phase * 0.7) * 8) * sdt;
+    b.vy *= 1 - sdt * 0.8; // импульс форсунки затухает → переходит в дрейф
+    // отскок от стенок ванны (не лезть под HUD сверху)
+    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); }
+    if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx); }
+    if (b.y < b.r + 64) { b.y = b.r + 64; b.vy = Math.abs(b.vy) * 0.6; }
+    if (b.y > H - b.r) { b.y = H - b.r; b.vy = -Math.abs(b.vy) * 0.6; }
   }
-  bubbles = bubbles.filter((b) => !b.pop && b.y > -b.r - 40);
+  // Убираем лопнутые и «растворившиеся» (отжившие свой срок).
+  bubbles = bubbles.filter((b) => !b.pop && b.age < b.life);
 
   // Частицы.
   for (const p of particles) {
@@ -707,8 +813,12 @@ const EMOJI = { duck: "🦆", warm: "🔥", bomb: "💣", rainbow: "🌈", ice: 
 
 function drawBubble(b) {
   const col = bubbleColor(b.type);
+  const a = bubbleAlpha(b); // проявление/растворение
+  const sc = 0.7 + 0.3 * a; // лёгкий «поп» при появлении
   ctx.save();
+  ctx.globalAlpha = a;
   ctx.translate(b.x, b.y);
+  ctx.scale(sc, sc);
 
   const grad = ctx.createRadialGradient(
     -b.r * 0.3,
