@@ -61,14 +61,38 @@
     <!-- Экран окончания -->
     <section id="end-screen" class="overlay hidden">
       <div class="card">
-        <div class="big-emoji">🧊</div>
-        <h1>Вода остыла…</h1>
-        <p class="subtitle">Пора выходить. Но можно набрать свежую!</p>
+        <div class="big-emoji" id="end-emoji">🧊</div>
+        <h1 id="end-title">Вода остыла…</h1>
+        <p class="subtitle" id="end-sub">Пора выходить. Но можно набрать свежую!</p>
         <div class="final-stats">
           <div><span id="final-score">0</span><small>очков</small></div>
           <div><span id="final-best">0</span><small>рекорд</small></div>
         </div>
         <button id="again-btn" class="big-btn">Ещё разок</button>
+      </div>
+    </section>
+
+    <!-- Прорыв на 100 000: переход в мини-РПГ -->
+    <section id="rpg-intro" class="overlay hidden">
+      <div class="card">
+        <div class="big-emoji">🚽</div>
+        <h1>Природа зовёт!</h1>
+        <p class="subtitle">
+          100 000 очков! Но вода больше не спасёт — нужно <b>вылезти из ванны</b>
+          и дойти до унитаза. Тапай, куда идти. <b>Осторожно: лужи!</b>
+          Поскользнёшься — конец.
+        </p>
+        <button id="rpg-go-btn" class="big-btn">Вылезти из ванны</button>
+      </div>
+    </section>
+
+    <!-- Дела сделаны -->
+    <section id="rpg-done" class="overlay hidden">
+      <div class="card">
+        <div class="big-emoji">😌</div>
+        <h1>Уф, полегчало!</h1>
+        <p class="subtitle">Дела сделаны. Можно снова нырять — впереди новый заход.</p>
+        <button id="rpg-back-btn" class="big-btn">Залезть обратно в ванну</button>
       </div>
     </section>
   </div>

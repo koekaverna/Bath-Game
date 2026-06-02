@@ -18,6 +18,11 @@ const startScreen = document.getElementById("start-screen");
 const endScreen = document.getElementById("end-screen");
 const finalScoreEl = document.getElementById("final-score");
 const finalBestEl = document.getElementById("final-best");
+const endEmoji = document.getElementById("end-emoji");
+const endTitle = document.getElementById("end-title");
+const endSub = document.getElementById("end-sub");
+const rpgIntro = document.getElementById("rpg-intro");
+const rpgDoneScreen = document.getElementById("rpg-done");
 
 let W = 0;
 let H = 0;
@@ -37,9 +42,14 @@ window.addEventListener("resize", resize);
 resize();
 
 /* ---------------- Состояние игры ---------------- */
-const STATE = { MENU: 0, PLAYING: 1, OVER: 2 };
+const STATE = { MENU: 0, PLAYING: 1, OVER: 2, RPG: 3 };
 let state = STATE.MENU;
 let zenMode = false;
+
+const RPG_SCORE = 100000; // порог «природа зовёт»
+let rpgTriggered = false; // чтобы сработало один раз за заход
+let round = 1; // номер захода (после унитаза +1)
+let rpg = null; // состояние мини-РПГ
 
 let bubbles = [];
 let particles = [];
@@ -338,10 +348,15 @@ function startGame(zen) {
   shake = 0;
   flash = null;
   cameo = null;
+  rpgTriggered = false;
+  rpg = null;
+  round = 1;
   scoreEl.textContent = "0";
   hud.classList.remove("hidden");
   startScreen.classList.add("hidden");
   endScreen.classList.add("hidden");
+  rpgIntro.classList.add("hidden");
+  rpgDoneScreen.classList.add("hidden");
 
   // Стартовый «подарок»: сразу наполняем экран пузырями по всей площади
   // (с тёплыми), чтобы было чем прогреться и экран не был пустым.
@@ -352,17 +367,232 @@ function startGame(zen) {
   updateWarmthUI();
 }
 
-function endGame() {
+function endGame(reason) {
   state = STATE.OVER;
+  rpg = null;
   if (score > best) {
     best = score;
     localStorage.setItem(BEST_KEY, String(best));
   }
+  if (reason === "slip") {
+    endEmoji.textContent = "🩹";
+    endTitle.textContent = "Поскользнулся!";
+    endSub.textContent = "Эх, лужа у ванны. Бывает. Попробуем ещё раз!";
+  } else {
+    endEmoji.textContent = "🧊";
+    endTitle.textContent = "Вода остыла…";
+    endSub.textContent = "Пора выходить. Но можно набрать свежую!";
+  }
   finalScoreEl.textContent = score;
   finalBestEl.textContent = best;
   hud.classList.add("hidden");
+  rpgIntro.classList.add("hidden");
+  rpgDoneScreen.classList.add("hidden");
   endScreen.classList.remove("hidden");
   haptic([30, 60, 30]);
+}
+
+/* ============= Мини-РПГ: вылезти из ванны и дойти до унитаза ============= */
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function buildRPG() {
+  const m = Math.min(W, H);
+  const bw = Math.min(W * 0.52, 280);
+  const bh = bw * 0.6;
+  const bath = { x: W * 0.5 - bw / 2, y: 80, w: bw, h: bh };
+  const tw = m * 0.18;
+  const toilet = { x: W * 0.72 - tw / 2, y: H - tw * 1.7 - 50, w: tw, h: tw * 1.7 };
+
+  // Лужи: пара у самой ванны + несколько по полу.
+  const puddles = [
+    { x: bath.x + bw * 0.25, y: bath.y + bh + 55, r: rand(36, 52) },
+    { x: bath.x + bw * 0.78, y: bath.y + bh + 80, r: rand(36, 52) },
+  ];
+  for (let i = 0; i < 4; i++) {
+    puddles.push({
+      x: rand(60, W - 60),
+      y: rand(bath.y + bh + 150, toilet.y - 70),
+      r: rand(30, 54),
+    });
+  }
+
+  const px = W * 0.5;
+  const py = bath.y + bh + 28;
+  rpg = {
+    phase: "intro",
+    bath,
+    toilet,
+    puddles,
+    player: { x: px, y: py, tx: px, ty: py, r: 22, speed: 230 },
+    sit: 0,
+    t: 0,
+  };
+}
+
+function triggerRPG() {
+  rpgTriggered = true;
+  buildRPG();
+  state = STATE.RPG;
+  hud.classList.add("hidden");
+  rpgIntro.classList.remove("hidden");
+  haptic([20, 40, 20, 40]);
+}
+
+function updateRPG(dt) {
+  if (!rpg) return;
+  rpg.t += dt;
+  if (rpg.phase === "sitting") {
+    rpg.sit += dt;
+    if (rpg.sit >= 2.2) {
+      rpg.phase = "done";
+      rpgDoneScreen.classList.remove("hidden");
+      haptic([10, 30, 10]);
+    }
+    return;
+  }
+  if (rpg.phase !== "walk") return;
+
+  const p = rpg.player;
+  const dx = p.tx - p.x;
+  const dy = p.ty - p.y;
+  const d = Math.hypot(dx, dy);
+  if (d > 1) {
+    const step = Math.min(d, p.speed * dt);
+    p.x += (dx / d) * step;
+    p.y += (dy / d) * step;
+  }
+
+  // Поскользнулся на луже → конец.
+  for (const pd of rpg.puddles) {
+    if (Math.hypot(p.x - pd.x, p.y - pd.y) < pd.r + p.r * 0.4) {
+      endGame("slip");
+      return;
+    }
+  }
+
+  // Дошёл до унитаза → садимся.
+  const t = rpg.toilet;
+  if (p.x > t.x - p.r && p.x < t.x + t.w + p.r && p.y > t.y - p.r) {
+    rpg.phase = "sitting";
+    rpg.sit = 0;
+    p.x = t.x + t.w / 2;
+    p.y = t.y + t.h * 0.42;
+  }
+}
+
+// Продолжаем после унитаза: новый заход, счёт копится дальше.
+function resumeBath() {
+  round += 1;
+  rpgTriggered = false;
+  rpg = null;
+  state = STATE.PLAYING;
+  bubbles = [];
+  particles = [];
+  ripples = [];
+  popups = [];
+  embers = [];
+  initJets();
+  spawnTimer = 0;
+  patternTimer = 6;
+  warmth = WARM_MAX; // свежая горячая вода
+  combo = 0;
+  comboTimer = 0;
+  comboEl.classList.remove("show");
+  rpgDoneScreen.classList.add("hidden");
+  hud.classList.remove("hidden");
+  for (let i = 0; i < 9; i++) spawnAnywhere(i % 2 === 0 ? "warm" : null);
+  updateWarmthUI();
+  addPopup(W / 2, H * 0.3, "Заход " + round + "!", "#fff");
+}
+
+function renderRPG(time) {
+  // Пол с плиткой.
+  ctx.fillStyle = "#dde8ec";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(120,150,160,0.25)";
+  ctx.lineWidth = 1;
+  const tile = Math.max(44, W / 8);
+  for (let x = 0; x <= W; x += tile) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += tile) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  if (!rpg) return;
+
+  // Ванна (вид сверху).
+  const b = rpg.bath;
+  roundRect(b.x, b.y, b.w, b.h, 30);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = "#9bb4bd";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  roundRect(b.x + 16, b.y + 16, b.w - 32, b.h - 32, 22);
+  ctx.fillStyle = "#7fd0e0";
+  ctx.fill();
+  ctx.font = "26px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("🛁", b.x + b.w / 2, b.y + b.h / 2);
+
+  // Лужи.
+  for (const pd of rpg.puddles) {
+    ctx.save();
+    ctx.translate(pd.x, pd.y);
+    ctx.scale(1, 0.7);
+    ctx.beginPath();
+    ctx.arc(0, 0, pd.r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(80,165,255,0.5)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(150,210,255,0.8)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Унитаз.
+  const t = rpg.toilet;
+  ctx.font = `${t.w * 1.5}px serif`;
+  ctx.fillText("🚽", t.x + t.w / 2, t.y + t.h / 2);
+
+  // Цель (куда тапнул).
+  const p = rpg.player;
+  if (rpg.phase === "walk" && Math.hypot(p.tx - p.x, p.ty - p.y) > 4) {
+    ctx.beginPath();
+    ctx.arc(p.tx, p.ty, 10 + Math.sin(time * 0.01) * 3, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(60,90,100,0.6)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Игрок.
+  ctx.font = `${p.r * 2.2}px serif`;
+  ctx.fillText(rpg.phase === "sitting" ? "🧎" : "🧍", p.x, p.y - p.r * 0.4);
+
+  // Текст-подсказка / прогресс.
+  ctx.fillStyle = "#2b4750";
+  ctx.font = "700 20px -apple-system, sans-serif";
+  if (rpg.phase === "walk") {
+    ctx.fillText("Дойди до 🚽, обходи лужи!", W / 2, H - 24);
+  } else if (rpg.phase === "sitting") {
+    ctx.fillText("Делаем дела… " + Math.ceil(2.2 - rpg.sit) + "с", W / 2, H - 24);
+  }
 }
 
 /* ---------------- Эффекты ---------------- */
@@ -528,11 +758,21 @@ function rainbowSweep() {
 }
 
 function pointerHandler(e) {
-  if (state === STATE.MENU || state === STATE.OVER) return;
+  if (state !== STATE.PLAYING && state !== STATE.RPG) return;
   initAudio();
   if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   const touches = e.changedTouches ? e.changedTouches : [e];
-  for (const t of touches) popAt(t.clientX, t.clientY);
+  for (const t of touches) {
+    if (state === STATE.RPG) {
+      // В мини-РПГ тап задаёт, куда идти.
+      if (rpg && rpg.phase === "walk") {
+        rpg.player.tx = t.clientX;
+        rpg.player.ty = t.clientY;
+      }
+    } else {
+      popAt(t.clientX, t.clientY);
+    }
+  }
 }
 canvas.addEventListener(
   "touchstart",
@@ -598,6 +838,12 @@ function update(dt) {
   // Прогресс «накала» 0..1 (плавно к панике/огню).
   panic = Math.min(1, (curLevel - 1) / (MAX_LEVEL - 1));
   const lev = curLevel - 1;
+
+  // Природа зовёт: на пороге 100 000 (и кратных) — мини-РПГ к унитазу.
+  if (!rpgTriggered && score >= RPG_SCORE * round) {
+    triggerRPG();
+    return;
+  }
 
   // --- Режиссёр появления (всё сразу) ---
   // Форсунки: двигаются по ширине и периодически бьют пузырём снизу.
@@ -941,8 +1187,13 @@ function render(time) {
 function loop(time) {
   const dt = Math.min(0.05, (time - lastTime) / 1000 || 0);
   lastTime = time;
-  update(dt);
-  render(time);
+  if (state === STATE.RPG) {
+    updateRPG(dt);
+    renderRPG(time);
+  } else {
+    update(dt);
+    render(time);
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -958,4 +1209,11 @@ document.getElementById("zen-btn").addEventListener("click", () => {
 });
 document.getElementById("again-btn").addEventListener("click", () => {
   startGame(zenMode);
+});
+document.getElementById("rpg-go-btn").addEventListener("click", () => {
+  rpgIntro.classList.add("hidden");
+  if (rpg) rpg.phase = "walk";
+});
+document.getElementById("rpg-back-btn").addEventListener("click", () => {
+  resumeBath();
 });
