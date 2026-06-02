@@ -61,6 +61,34 @@ let flash = null; // {color, a} вспышка на весь экран
 const BEST_KEY = "bathgame_best";
 let best = parseInt(localStorage.getItem(BEST_KEY) || "0", 10);
 
+// Мем-камео: дерп-лицо вылетает снизу экрана в стиле Mortal Kombat.
+const derpImg = new Image();
+let derpReady = false;
+derpImg.onload = () => (derpReady = true);
+derpImg.src = "derp.svg";
+let cameo = null; // {t, dur, x}
+
+function triggerCameo() {
+  if (cameo) return; // не накладываем друг на друга
+  cameo = { t: 0, dur: 1.5, x: rand(0.25, 0.75) };
+  yell();
+  haptic([8, 24, 8]);
+}
+function yell() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(420, t);
+  osc.frequency.exponentialRampToValueAtTime(120, t + 0.5);
+  gain.gain.setValueAtTime(0.18, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.5);
+}
+
 const PRAISE = [
   "класс!",
   "огонь!",
@@ -165,6 +193,7 @@ function startGame(zen) {
   timeScale = 1;
   shake = 0;
   flash = null;
+  cameo = null;
   scoreEl.textContent = "0";
   hud.classList.remove("hidden");
   startScreen.classList.add("hidden");
@@ -251,6 +280,7 @@ function popBubble(b, byTap) {
       comboEl.textContent = praise + "×" + combo;
       comboEl.classList.add("show");
     }
+    if (combo > 0 && combo % 12 === 0) triggerCameo(); // мем за жирное комбо
   }
 
   const col = bubbleColor(b.type);
@@ -280,6 +310,7 @@ function popBubble(b, byTap) {
       shake = Math.min(shake + 16, 22);
       addFlash("rgba(255,160,80,0.5)");
       haptic([20, 40, 20]);
+      triggerCameo();
       break;
 
     case "rainbow":
@@ -291,6 +322,7 @@ function popBubble(b, byTap) {
       pluck(660, 0.4, 0.16, "triangle");
       pluck(990, 0.4, 0.12);
       haptic([15, 30, 15, 30, 15]);
+      triggerCameo();
       break;
 
     case "star":
@@ -475,6 +507,12 @@ function update(dt) {
     flash.a -= dt * 1.6;
     if (flash.a <= 0) flash = null;
   }
+
+  // Камео-лицо.
+  if (cameo) {
+    cameo.t += dt;
+    if (cameo.t >= cameo.dur) cameo = null;
+  }
 }
 
 /* ---------------- Отрисовка ---------------- */
@@ -601,6 +639,21 @@ function render(time) {
       Math.max(0, flash.a).toFixed(2) + ")"
     );
     ctx.fillRect(0, 0, W, H);
+  }
+
+  // Камео-лицо: выезжает снизу, дёргается и уезжает обратно.
+  if (cameo && derpReady) {
+    const p = cameo.t / cameo.dur; // 0..1
+    const rise = Math.sin(Math.min(1, p) * Math.PI); // 0→1→0
+    const size = Math.min(W, H) * 0.5;
+    const peek = size * 0.92; // насколько высовывается
+    const wob = Math.sin(cameo.t * 28) * 6 * rise; // дрожь
+    const x = cameo.x * W - size / 2 + wob;
+    const y = H - peek * rise;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, rise * 1.6);
+    ctx.drawImage(derpImg, x, y, size, size);
+    ctx.restore();
   }
 }
 

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+  <!-- Дерп-лицо: орущая рожа в стиле rage-comic -->
+  <defs>
+    <radialGradient id="skin" cx="42%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#fbe6cf"/>
+      <stop offset="1" stop-color="#e9c7a0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- голова -->
+  <path d="M110 14
+           C162 14 196 52 196 104
+           C196 150 172 196 110 206
+           C48 196 24 150 24 104
+           C24 52 58 14 110 14 Z"
+        fill="url(#skin)" stroke="#3a2a1c" stroke-width="5"/>
+
+  <!-- брови, вздёрнутые -->
+  <path d="M48 70 Q72 50 96 64" fill="none" stroke="#3a2a1c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M124 64 Q150 50 174 72" fill="none" stroke="#3a2a1c" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- левый глаз, выпучен -->
+  <ellipse cx="74" cy="92" rx="30" ry="34" fill="#fff" stroke="#3a2a1c" stroke-width="5"/>
+  <circle cx="64" cy="84" r="9" fill="#1a1a1a"/>
+
+  <!-- правый глаз, выпучен, косит -->
+  <ellipse cx="146" cy="92" rx="30" ry="34" fill="#fff" stroke="#3a2a1c" stroke-width="5"/>
+  <circle cx="158" cy="86" r="9" fill="#1a1a1a"/>
+
+  <!-- широко открытый орущий рот -->
+  <path d="M70 142
+           Q110 132 150 142
+           Q160 178 110 188
+           Q60 178 70 142 Z"
+        fill="#5a1d1d" stroke="#3a2a1c" stroke-width="5"/>
+  <!-- верхние зубы -->
+  <path d="M74 146 Q110 138 146 146 L142 156 Q110 150 78 156 Z" fill="#fff"/>
+  <!-- язык -->
+  <ellipse cx="110" cy="178" rx="22" ry="12" fill="#d65a5a"/>
+</svg>
