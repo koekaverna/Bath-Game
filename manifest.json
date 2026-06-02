@@ -1,0 +1,18 @@
+{
+  "name": "Тёплая Ванна",
+  "short_name": "Ванна",
+  "description": "Расслабляющая игра для тех, кто лежит в ванной. Лопай пузыри одним пальцем.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a3d4d",
+  "theme_color": "#0a3d4d",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

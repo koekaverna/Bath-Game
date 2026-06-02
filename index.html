@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#0a3d4d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Тёплая Ванна — расслабляющая игра для тех, кто лежит в ванной. Лопай пузыри одним пальцем." />
+  <title>🛁 Тёплая Ванна</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <!-- Верхняя панель: счёт и тепло воды -->
+    <header id="hud" class="hidden">
+      <div class="hud-score">
+        <span class="hud-label">очки</span>
+        <span id="score">0</span>
+      </div>
+      <div class="hud-combo" id="combo"></div>
+      <div class="hud-warmth">
+        <span class="hud-label">тепло воды</span>
+        <div class="warmth-bar"><div id="warmth-fill"></div></div>
+      </div>
+    </header>
+
+    <!-- Стартовый экран -->
+    <section id="start-screen" class="overlay">
+      <div class="card">
+        <div class="big-emoji">🛁</div>
+        <h1>Тёплая Ванна</h1>
+        <p class="subtitle">Расслабляющая игра для тех,<br />кто лежит в ванной</p>
+        <ul class="rules">
+          <li>👆 Лопай пузыри одним пальцем</li>
+          <li>🔥 Красные пузыри греют воду</li>
+          <li>🦆 Уточка — щедрый бонус</li>
+          <li>🧊 Не дай воде остыть</li>
+        </ul>
+        <button id="start-btn" class="big-btn">Залезть в ванну</button>
+        <button id="zen-btn" class="ghost-btn">Дзен-режим (без стресса)</button>
+      </div>
+    </section>
+
+    <!-- Экран окончания -->
+    <section id="end-screen" class="overlay hidden">
+      <div class="card">
+        <div class="big-emoji">🧊</div>
+        <h1>Вода остыла…</h1>
+        <p class="subtitle">Пора выходить. Но можно набрать свежую!</p>
+        <div class="final-stats">
+          <div><span id="final-score">0</span><small>очков</small></div>
+          <div><span id="final-best">0</span><small>рекорд</small></div>
+        </div>
+        <button id="again-btn" class="big-btn">Ещё разок</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
